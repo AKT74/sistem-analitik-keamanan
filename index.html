@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Threat Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        header {
+            background: #333;
+            color: #fff;
+            padding: 10px 20px;
+            text-align: center;
+        }
+
+        main {
+            padding: 20px;
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            display: block;
+            margin: 10px 0;
+        }
+
+        button {
+            background: #007BFF;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>AI Threat Detection System</h1>
+    </header>
+    <main>
+        <section id="upload-section">
+            <h2>Upload Log File</h2>
+            <form id="log-upload-form">
+                <input type="file" id="log-file" accept=".txt, .log">
+                <button type="button" onclick="analyzeLog()">Analyze</button>
+            </form>
+        </section>
+        <section id="dashboard-section" style="display: none;">
+            <h2>Threat Dashboard</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Risk Score</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboard-table-body">
+                </tbody>
+            </table>
+        </section>
+    </main>
+    <script>
+        // Tabel nilai DREAD berdasarkan kategori ancaman
+        const DREAD_TABLE = {
+            "Spoofing": { damage: 7, reproducibility: 6, exploitability: 8, affectedUsers: 5, discoverability: 6 },
+            "Tampering": { damage: 8, reproducibility: 5, exploitability: 7, affectedUsers: 6, discoverability: 4 },
+            "Repudiation": { damage: 6, reproducibility: 3, exploitability: 5, affectedUsers: 4, discoverability: 7 },
+            "Information Disclosure": { damage: 7, reproducibility: 6, exploitability: 8, affectedUsers: 9, discoverability: 8 },
+            "Denial of Service": { damage: 9, reproducibility: 7, exploitability: 9, affectedUsers: 8, discoverability: 5 },
+            "Elevation of Privilege": { damage: 8, reproducibility: 6, exploitability: 9, affectedUsers: 7, discoverability: 7 }
+        };
+
+        // Aturan ancaman
+        const THREAT_RULES = [
+            {
+                name: "Login Tidak Sah",
+                category: "Spoofing",
+                pattern: /unauthorized login from .+/g,
+                recommendation: "Terapkan otentikasi multi-faktor."
+            },
+            {
+                name: "File Diubah",
+                category: "Tampering",
+                pattern: /file tampered: .+/g,
+                recommendation: "Aktifkan pemantauan integritas file."
+            },
+            {
+                name: "Data Sensitif Terungkap",
+                category: "Information Disclosure",
+                pattern: /sensitive data exposed in response/g,
+                recommendation: "Pastikan data sensitif dienkripsi."
+            },
+            {
+                name: "Permintaan Gagal Berulang",
+                category: "Denial of Service",
+                pattern: /multiple failed requests from .+/g,
+                recommendation: "Terapkan pembatasan kecepatan dan pemblokiran IP."
+            },
+            {
+                name: "Penulisan Log Audit Gagal",
+                category: "Repudiation",
+                pattern: /failed audit log write/g,
+                recommendation: "Pastikan ruang disk mencukupi untuk log audit."
+            },
+            {
+                name: "Hak Admin Diberikan",
+                category: "Elevation of Privilege",
+                pattern: /admin privileges granted to .+/g,
+                recommendation: "Batasi eskalasi hak istimewa dan catat tindakan admin."
+            },
+            {
+                name: "Akses File Tidak Sah",
+                category: "Tampering",
+                pattern: /unauthorized file access: .+/g,
+                recommendation: "Terapkan kontrol akses yang ketat dan pantau penggunaan file."
+            },
+            {
+                name: "SQL Injection Terdeteksi",
+                category: "Tampering",
+                pattern: /sql injection attempt detected from .+/g,
+                recommendation: "Sanitasi semua input dan gunakan pernyataan yang sudah disiapkan."
+            },
+            {
+                name: "Cross-Site Scripting (XSS)",
+                category: "Information Disclosure",
+                pattern: /xss attack detected: .+/g,
+                recommendation: "Terapkan Content Security Policy (CSP) dan sanitasi keluaran."
+            },
+            {
+                name: "Serangan DDoS Terdeteksi",
+                category: "Denial of Service",
+                pattern: /ddos attack detected from .+/g,
+                recommendation: "Gunakan mekanisme penyaringan lalu lintas dan pembatasan kecepatan."
+            },
+            {
+                name: "Kata Sandi Lemah Terdeteksi",
+                category: "Spoofing",
+                pattern: /weak password used by .+/g,
+                recommendation: "Terapkan kebijakan kata sandi yang kuat."
+            },
+            {
+                name: "Upaya Login Brute Force",
+                category: "Denial of Service",
+                pattern: /brute force login attempt detected from .+/g,
+                recommendation: "Kunci akun setelah beberapa kali gagal login."
+            },
+            {
+                name: "Email Phishing Terdeteksi",
+                category: "Spoofing",
+                pattern: /phishing email detected: .+/g,
+                recommendation: "Latih pengguna mengenali email phishing dan gunakan filter email."
+            },
+            {
+                name: "Upaya Unduhan Malware",
+                category: "Elevation of Privilege",
+                pattern: /malware download attempt from .+/g,
+                recommendation: "Gunakan solusi antivirus dan blokir URL mencurigakan."
+            },
+            {
+                name: "Shutdown Sistem Tak Terduga",
+                category: "Repudiation",
+                pattern: /unexpected system shutdown detected/g,
+                recommendation: "Selidiki log dan pastikan stabilitas pasokan daya."
+            },
+            {
+                name: "Aturan Firewall Diubah",
+                category: "Tampering",
+                pattern: /firewall rule modified by .+/g,
+                recommendation: "Catat dan batasi perubahan aturan firewall hanya untuk personel yang berwenang."
+            },
+            {
+                name: "Upaya Eskalasi Hak Istimewa",
+                category: "Elevation of Privilege",
+                pattern: /privilege escalation attempt detected by .+/g,
+                recommendation: "Catat dan beri peringatan pada semua aktivitas eskalasi hak istimewa."
+            },
+            {
+                name: "Akses API Tidak Sah",
+                category: "Information Disclosure",
+                pattern: /unauthorized api access from .+/g,
+                recommendation: "Terapkan validasi kunci API dan pantau penggunaan."
+            },
+            {
+                name: "Eksfiltrasi Data Terdeteksi",
+                category: "Information Disclosure",
+                pattern: /data exfiltration attempt detected/g,
+                recommendation: "Gunakan solusi Data Loss Prevention (DLP) untuk memantau data sensitif."
+            }
+
+            // Tambahkan aturan lain sesuai kebutuhan
+        ];
+
+        // Fungsi untuk menghitung skor DREAD
+        function calculateDREADScore(category) {
+            const dread = DREAD_TABLE[category];
+            if (!dread) {
+                console.error(`Kategori tidak ditemukan: ${category}`);
+                return 0;
+            }
+
+            const score = (
+                dread.damage +
+                dread.reproducibility +
+                dread.exploitability +
+                dread.affectedUsers +
+                dread.discoverability
+            ) / 5;
+            return score.toFixed(2);
+        }
+
+        // Fungsi untuk menganalisis log
+        function analyzeLog() {
+            const fileInput = document.getElementById('log-file');
+            if (!fileInput.files.length) {
+                alert("Please upload a file!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const content = event.target.result;
+                const tableBody = document.getElementById('dashboard-table-body');
+                tableBody.innerHTML = ''; // Bersihkan hasil sebelumnya
+                let threatCount = 0;
+
+                THREAT_RULES.forEach(rule => {
+                    const matches = [...content.matchAll(rule.pattern)];
+                    matches.forEach(match => {
+                        threatCount++;
+                        const riskScore = calculateDREADScore(rule.category);
+                        const row = `<tr>
+                            <td>${threatCount}</td>
+                            <td>${rule.name}</td>
+                            <td>${rule.category}</td>
+                            <td>${riskScore}</td>
+                            <td>${rule.recommendation}</td>
+                        </tr>`;
+                        tableBody.innerHTML += row;
+                    });
+                });
+
+                if (threatCount > 0) {
+                    document.getElementById('dashboard-section').style.display = 'block';
+                } else {
+                    alert('No threats detected in the uploaded log file.');
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+
+</html>
